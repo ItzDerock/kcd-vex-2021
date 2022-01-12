@@ -65,6 +65,23 @@ bool back_piston_extended = false;
 bool barliftGrabber_extended = false;
 bool isDriveHoldMode = false;
 
+Motor grabber_mtr(RIGHT_GRABBER);
+Motor barliftGrabber(BAR_LIFT_GRABBER);
+Motor backGrabber(BACK_GRABBER);
+// TODO: Move this to auto start!
+// grabber_mtr.moveRelative(-0.5, 1000);
+// grabber_mtr.tarePosition();
+
+void toggleBackGrabber() {
+	back_piston_extended = !back_piston_extended;
+	backGrabber.moveAbsolute(back_piston_extended ? -0.25 : 1.5, 1000);
+}
+
+void toggleFrontGrabber() {
+	barliftGrabber_extended = !barliftGrabber_extended;
+	barliftGrabber.moveAbsolute(barliftGrabber_extended ? 0.25 : 0, 1000);
+}
+
 /**
  * Runs initialization code. This occurs as soon as the program is started.
  *
@@ -81,6 +98,16 @@ void initialize() {
 	pros::ADIDigitalOut piston (PNEUMATICS);
 	piston.set_value(false);
 	piston_extended = false;
+
+	// barliftGrabber.moveAbsolute(-0.25, 1000);
+	// barliftGrabber.tarePosition();
+
+	barliftGrabber.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
+	barliftGrabber.setBrakeMode(AbstractMotor::brakeMode::hold);
+	backGrabber.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
+	backGrabber.setBrakeMode(AbstractMotor::brakeMode::hold);
+	grabber_mtr.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
+	grabber_mtr.setBrakeMode(AbstractMotor::brakeMode::hold);
 }
 
 /**
@@ -115,6 +142,34 @@ void competition_initialize() {}
 void autonomous() {
 	pros::lcd::set_text(0, "[!] Autonomous");
 
+	toggleBackGrabber();
+	toggleBackGrabber();
+
+	chassis->setMaxVelocity(50);
+	chassis->moveDistance(-93_cm);
+	toggleFrontGrabber();
+	chassis->getModel()->right(35);
+	chassis->getModel()->left(-35);
+	pros::delay(700);
+	chassis->getModel()->stop();
+	chassis->getModel()->right(-35);
+	chassis->getModel()->left(35);
+	pros::delay(700);
+	toggleBackGrabber();
+	chassis->moveDistance(40_cm);
+	chassis->turnAngle(-45_deg);
+	chassis->moveDistance(20_cm);
+	toggleFrontGrabber();
+	barLift.moveVelocity(20);
+	pros::delay(400);
+	barLift.moveVelocity(0);
+	chassis->turnAngle(45_deg);
+	chassis->moveDistance(33_cm);
+	chassis->turnAngle(90_deg);
+	barLift.moveVelocity(-20);
+	pros::delay(400);
+	barLift.moveVelocity(0);
+	chassis->moveDistance(100_cm);
 }
 
 /**
@@ -132,22 +187,6 @@ void autonomous() {
  */
 void opcontrol() {
 	pros::lcd::set_text(0, "[!] Driver Control");
-
-	Motor grabber_mtr(RIGHT_GRABBER);
-	Motor barliftGrabber(BAR_LIFT_GRABBER);
-	Motor backGrabber(BACK_GRABBER);
-	// TODO: Move this to auto start!
-	// grabber_mtr.moveRelative(-0.5, 1000);
-	// grabber_mtr.tarePosition();
-	barliftGrabber.moveAbsolute(-0.25, 1000);
-	barliftGrabber.tarePosition();
-
-	barliftGrabber.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
-	barliftGrabber.setBrakeMode(AbstractMotor::brakeMode::hold);
-	backGrabber.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
-	backGrabber.setBrakeMode(AbstractMotor::brakeMode::hold);
-	grabber_mtr.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
-	grabber_mtr.setBrakeMode(AbstractMotor::brakeMode::hold);
 
 	auto XPressed = ControllerButtonHandler(&controller, ControllerDigital::X);
 	auto APressed = ControllerButtonHandler(&controller, ControllerDigital::A);
@@ -196,13 +235,11 @@ void opcontrol() {
 		}
 
 		if(BPressed.update()) {
-			back_piston_extended = !back_piston_extended;
-			backGrabber.moveAbsolute(back_piston_extended ? -0.25 : 1.5, 1000);
+			toggleBackGrabber();
 		}
 
 		if(XPressed.update()) {
-			barliftGrabber_extended = !barliftGrabber_extended;
-			barliftGrabber.moveAbsolute(barliftGrabber_extended ? 0.25 : 0, 1000);
+			toggleFrontGrabber();
 		}
 
 		pros::delay(10);
