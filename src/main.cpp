@@ -12,6 +12,33 @@
 #define RIGHT_GRABBER -14
 #define BACK_GRABBER -11
 
+class ControllerButtonHandler {
+	// create a class that takes in controller, a ControllerDigital button
+	private:
+		Controller *controller;
+		ControllerDigital button;
+		bool wasPressed;
+
+	public:
+		ControllerButtonHandler(Controller *controller, ControllerDigital button) {
+			this->controller = controller;
+			this->button = button;
+
+			this->wasPressed = false;
+		}
+
+		bool update() {
+			// Get the controller
+			Controller controller = *this->controller;
+
+			bool pressed = controller.getDigital(button);
+			bool status = pressed && !wasPressed;
+			wasPressed = pressed;
+
+			return status;
+		}
+};
+
 std::shared_ptr<ChassisController> chassis =
 	ChassisControllerBuilder()
 		.withMotors(DRIVE_TRAIN_LEFT, DRIVE_TRAIN_RIGHT)
@@ -122,10 +149,11 @@ void opcontrol() {
 	grabber_mtr.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
 	grabber_mtr.setBrakeMode(AbstractMotor::brakeMode::hold);
 
-	bool wasAPressed = false;
-	bool wasXPressed = false;
-	bool wasBPressed = false;
-	bool wasDownPressed = false;
+	auto XPressed = ControllerButtonHandler(&controller, ControllerDigital::X);
+	auto APressed = ControllerButtonHandler(&controller, ControllerDigital::A);
+	auto BPressed = ControllerButtonHandler(&controller, ControllerDigital::B);
+	auto DownPressed = ControllerButtonHandler(&controller, ControllerDigital::down);
+
 	while (true) {
 		auto leftMoveStick = controller.getAnalog(ControllerAnalog::leftY);
 		auto rightMoveStick = controller.getAnalog(ControllerAnalog::rightY);
@@ -152,8 +180,7 @@ void opcontrol() {
 			barLift.moveVelocity(l1Pressed ? +20 : -20);
 		}
 
-		bool DownPressed = controller.getDigital(ControllerDigital::down);
-		if(!wasDownPressed && DownPressed) {
+		if(DownPressed.update()) {
 			isDriveHoldMode = !isDriveHoldMode;
 			if(isDriveHoldMode) {
 				chassis->getModel()->setBrakeMode(AbstractMotor::brakeMode::hold);
@@ -163,31 +190,20 @@ void opcontrol() {
 			pros::lcd::set_text(4, isDriveHoldMode ? "Drive Train in BREAK mode" : "Drive Train in HOLD mode");
 		}
 
-		// controller.operator[](ControllerDigital::A)
-
-		bool APressed = controller.getDigital(ControllerDigital::A);
-		if(!wasAPressed && APressed) {
+		if(APressed.update()) {
 			piston_extended = !piston_extended;
 			grabber_mtr.moveAbsolute(piston_extended ? 0.5 : 1.5, 1000);
 		}
 
-		wasAPressed = APressed;
-
-		bool BPressed = controller.getDigital(ControllerDigital::B);
-		if(!wasBPressed && BPressed) {
+		if(BPressed.update()) {
 			back_piston_extended = !back_piston_extended;
 			backGrabber.moveAbsolute(back_piston_extended ? -0.25 : 1.5, 1000);
 		}
 
-		wasBPressed = BPressed;
-
-		bool XPressed = controller.getDigital(ControllerDigital::X);
-		if(!wasXPressed && XPressed) {
+		if(XPressed.update()) {
 			barliftGrabber_extended = !barliftGrabber_extended;
 			barliftGrabber.moveAbsolute(barliftGrabber_extended ? 0.25 : 0, 1000);
 		}
-
-		wasXPressed = XPressed;
 
 		pros::delay(10);
 	}
