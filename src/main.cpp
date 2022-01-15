@@ -4,16 +4,18 @@
 
 #define BAR_LIFT_LEFT 20
 #define BAR_LIFT_RIGHT 19
-#define BAR_LIFT_GRABBER 17
+#define BAR_LIFT_GRABBER 9
 
 #define DRIVE_TRAIN_LEFT 1
 #define DRIVE_TRAIN_RIGHT -2
 
 #define RIGHT_GRABBER -14
+// START FULLY FORWARDS HITTING RUBBER BANDS
 #define BACK_GRABBER -11
 
+#define MIDDLE_GRABBER 16
+
 class ControllerButtonHandler {
-	// create a class that takes in controller, a ControllerDigital button
 	private:
 		Controller *controller;
 		ControllerDigital button;
@@ -28,7 +30,6 @@ class ControllerButtonHandler {
 		}
 
 		bool update() {
-			// Get the controller
 			Controller controller = *this->controller;
 
 			bool pressed = controller.getDigital(button);
@@ -63,23 +64,36 @@ std::string prd(const double x, const int decDigits) {
 bool piston_extended = false;
 bool back_piston_extended = false;
 bool barliftGrabber_extended = false;
+bool middleGrabber_extended = false;
 bool isDriveHoldMode = false;
 
-Motor grabber_mtr(RIGHT_GRABBER);
+Motor rightGrabber(RIGHT_GRABBER);
 Motor barliftGrabber(BAR_LIFT_GRABBER);
 Motor backGrabber(BACK_GRABBER);
+Motor middleGrabber(MIDDLE_GRABBER);
 // TODO: Move this to auto start!
-// grabber_mtr.moveRelative(-0.5, 1000);
-// grabber_mtr.tarePosition();
+// rightGrabber.moveRelative(-0.5, 1000);
+// rightGrabber.tarePosition();
 
 void toggleBackGrabber() {
 	back_piston_extended = !back_piston_extended;
-	backGrabber.moveAbsolute(back_piston_extended ? -0.25 : 1.5, 1000);
+	backGrabber.moveAbsolute(back_piston_extended ? -0.75 : 1.5, 1000);
 }
 
 void toggleFrontGrabber() {
 	barliftGrabber_extended = !barliftGrabber_extended;
 	barliftGrabber.moveAbsolute(barliftGrabber_extended ? 0.25 : 0, 1000);
+}
+
+void toggleMiddleGrabber() {
+	middleGrabber_extended = !middleGrabber_extended;
+	middleGrabber.moveAbsolute(middleGrabber_extended ? 0.75 : 0, 1000);
+}
+
+void waitForMotorToStop(Motor motor) {
+	while(abs(motor.getPosition() - motor.getTargetPosition()) > 0.2) {
+		pros::delay(20);
+	}
 }
 
 /**
@@ -106,8 +120,10 @@ void initialize() {
 	barliftGrabber.setBrakeMode(AbstractMotor::brakeMode::hold);
 	backGrabber.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
 	backGrabber.setBrakeMode(AbstractMotor::brakeMode::hold);
-	grabber_mtr.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
-	grabber_mtr.setBrakeMode(AbstractMotor::brakeMode::hold);
+	rightGrabber.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
+	rightGrabber.setBrakeMode(AbstractMotor::brakeMode::hold);
+	middleGrabber.setEncoderUnits(AbstractMotor::encoderUnits::rotations);
+	middleGrabber.setBrakeMode(AbstractMotor::brakeMode::hold);
 }
 
 /**
@@ -142,20 +158,46 @@ void competition_initialize() {}
 void autonomous() {
 	pros::lcd::set_text(0, "[!] Autonomous");
 
+	int maxVelocity = 50;
+
+	// Intialize
+	backGrabber.moveAbsolute(1.1, 1000);
+	waitForMotorToStop(backGrabber);
+	backGrabber.tarePosition();
+
+ 	// TODO: Uncomment when its back
+	// rightGrabber.moveAbsolute(0.5, 1000);
+	// waitForMotorToStop(backGrabber);
+	// rightGrabber.tarePosition();
+
+	// Extend back grabber to pickup back ring
 	toggleBackGrabber();
 	toggleBackGrabber();
 
-	chassis->setMaxVelocity(50);
-	chassis->moveDistance(-93_cm);
+	// TODO: REMOVE AFTER testing
+	// Set the velocity to 50% so I can easily see what's happening.
+	chassis->setMaxVelocity(maxVelocity);
+
+	// Move backwards to the first ring.
+	chassis->moveDistance(-94_cm);
+
+	// Fully extend back grabber.
 	toggleFrontGrabber();
-	chassis->getModel()->right(35);
-	chassis->getModel()->left(-35);
+
+	// Turn a little to wiggle the ring in.
+	chassis->setMaxVelocity(20);
+	chassis->moveDistanceAsync(-10_cm);
+	chassis->setMaxVelocity(maxVelocity);
+	chassis->getModel()->right(10);
+	chassis->getModel()->left(-10);
 	pros::delay(700);
 	chassis->getModel()->stop();
-	chassis->getModel()->right(-35);
-	chassis->getModel()->left(35);
-	pros::delay(700);
+	pros::delay(300);
+
+	// Grab it.
 	toggleBackGrabber();
+
+	// Move to the other ring.
 	chassis->moveDistance(40_cm);
 	chassis->turnAngle(-45_deg);
 	chassis->moveDistance(20_cm);
@@ -192,6 +234,7 @@ void opcontrol() {
 	auto APressed = ControllerButtonHandler(&controller, ControllerDigital::A);
 	auto BPressed = ControllerButtonHandler(&controller, ControllerDigital::B);
 	auto DownPressed = ControllerButtonHandler(&controller, ControllerDigital::down);
+	auto UpPressed = ControllerButtonHandler(&controller, ControllerDigital::up);
 
 	while (true) {
 		auto leftMoveStick = controller.getAnalog(ControllerAnalog::leftY);
@@ -231,7 +274,7 @@ void opcontrol() {
 
 		if(APressed.update()) {
 			piston_extended = !piston_extended;
-			grabber_mtr.moveAbsolute(piston_extended ? 0.5 : 1.5, 1000);
+			rightGrabber.moveAbsolute(piston_extended ? 0.5 : 1.5, 1000);
 		}
 
 		if(BPressed.update()) {
@@ -240,6 +283,10 @@ void opcontrol() {
 
 		if(XPressed.update()) {
 			toggleFrontGrabber();
+		}
+
+		if(UpPressed.update()) {
+			toggleMiddleGrabber();
 		}
 
 		pros::delay(10);
