@@ -15,6 +15,8 @@
 
 #define MIDDLE_GRABBER 16
 
+#define EXTEND_O_ARM 17
+
 class ControllerButtonHandler {
 	private:
 		Controller *controller;
@@ -48,9 +50,12 @@ std::shared_ptr<ChassisController> chassis =
 
 Controller controller;
 
+Motor _barLiftLeft(BAR_LIFT_LEFT, false, AbstractMotor::gearset::red, AbstractMotor::encoderUnits::degrees);
+Motor _barLiftRight(BAR_LIFT_RIGHT, true, AbstractMotor::gearset::red, AbstractMotor::encoderUnits::degrees);
+
 MotorGroup barLift({
-	Motor(BAR_LIFT_LEFT, false, AbstractMotor::gearset::red, AbstractMotor::encoderUnits::degrees),
-	Motor(BAR_LIFT_RIGHT, true, AbstractMotor::gearset::red, AbstractMotor::encoderUnits::degrees)
+	_barLiftLeft,
+	_barLiftRight
 });
 
 std::string prd(const double x, const int decDigits) {
@@ -75,6 +80,15 @@ Motor middleGrabber(MIDDLE_GRABBER);
 // rightGrabber.moveRelative(-0.5, 1000);
 // rightGrabber.tarePosition();
 
+Motor ExtendyThing(EXTEND_O_ARM);
+
+void checkMotorTemp(Motor motor, int line) {
+	if(motor.getTemperature() > 50) {
+		controller.rumble("---");
+		pros::lcd::set_text(4, std::to_string(motor.getTemperature()) + " on " + std::to_string(motor.getPort()));
+	}
+}
+
 void toggleBackGrabber() {
 	back_piston_extended = !back_piston_extended;
 	backGrabber.moveAbsolute(back_piston_extended ? -0.75 : 1.5, 1000);
@@ -87,7 +101,7 @@ void toggleFrontGrabber() {
 
 void toggleMiddleGrabber() {
 	middleGrabber_extended = !middleGrabber_extended;
-	middleGrabber.moveAbsolute(middleGrabber_extended ? 0.75 : 0, 1000);
+	middleGrabber.moveAbsolute(middleGrabber_extended ? -1 : -0.4, 1000);
 }
 
 void waitForMotorToStop(Motor motor) {
@@ -252,7 +266,7 @@ void opcontrol() {
 		pros::lcd::set_text(2, "Left: " + prd(leftMoveStick, 2) + " | Right: " + prd(rightMoveStick, 2));
 
 		bool l1Pressed = controller.getDigital(ControllerDigital::L1);
-		bool l2Pressed = controller.getDigital(ControllerDigital::R1);
+		bool l2Pressed = controller.getDigital(ControllerDigital::L2);
 
 		if((!l1Pressed && !l2Pressed) || (l1Pressed && l2Pressed)) {
 			barLift.moveVelocity(0);
@@ -260,6 +274,15 @@ void opcontrol() {
 		} else {
 			pros::lcd::set_text(1, l1Pressed ? "Moving Lift Up" : "Moving Lift Down");
 			barLift.moveVelocity(l1Pressed ? +20 : -20);
+		}
+
+		bool r1Pressed = controller.getDigital(ControllerDigital::R1);
+		bool r2Pressed = controller.getDigital(ControllerDigital::R2);
+
+		if((!r1Pressed && !r2Pressed) || (r1Pressed && r2Pressed)) {
+			ExtendyThing.moveVelocity(0);
+		} else {
+			ExtendyThing.moveVelocity(r1Pressed ? +1000 : -1000);
 		}
 
 		if(DownPressed.update()) {
@@ -288,6 +311,14 @@ void opcontrol() {
 		if(UpPressed.update()) {
 			toggleMiddleGrabber();
 		}
+
+		int motorTempLine = -1;
+		checkMotorTemp(rightGrabber, ++motorTempLine);
+		checkMotorTemp(backGrabber, ++motorTempLine);
+		checkMotorTemp(rightGrabber, ++motorTempLine);
+		checkMotorTemp(_barLiftLeft, ++motorTempLine);
+		checkMotorTemp(_barLiftRight, ++motorTempLine);
+		// checkMotorTemp(barliftGrabber, ++motorTempLine);
 
 		pros::delay(10);
 	}
