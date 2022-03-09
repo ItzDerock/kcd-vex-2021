@@ -1,4 +1,5 @@
 #include "main.h"
+#include "utils.cpp"
 
 #define PNEUMATICS 'A'
 
@@ -6,8 +7,10 @@
 #define BAR_LIFT_RIGHT 19
 #define BAR_LIFT_GRABBER 9
 
-#define DRIVE_TRAIN_LEFT 1
-#define DRIVE_TRAIN_RIGHT -2
+#define DRIVE_TRAIN_LEFT -1
+#define DRIVE_TRAIN_RIGHT 2
+#define DRIVE_TRAIN_LEFT_BACK -4
+#define DRIVE_TRAIN_RIGHT_BACK 5
 
 #define RIGHT_GRABBER -14
 // START FULLY FORWARDS HITTING RUBBER BANDS
@@ -15,37 +18,24 @@
 
 #define MIDDLE_GRABBER 16
 
-#define EXTEND_O_ARM 17
+std::string prd(const double x, const int decDigits) {
+    std::stringstream ss;
+    ss << std::fixed;
+    ss.precision(decDigits); // set # places after decimal
+    ss << x;
+    return ss.str();
+}
 
-class ControllerButtonHandler {
-	private:
-		Controller *controller;
-		ControllerDigital button;
-		bool wasPressed;
-
-	public:
-		ControllerButtonHandler(Controller *controller, ControllerDigital button) {
-			this->controller = controller;
-			this->button = button;
-
-			this->wasPressed = false;
-		}
-
-		bool update() {
-			Controller controller = *this->controller;
-
-			bool pressed = controller.getDigital(button);
-			bool status = pressed && !wasPressed;
-			wasPressed = pressed;
-
-			return status;
-		}
-};
 
 std::shared_ptr<ChassisController> chassis =
 	ChassisControllerBuilder()
-		.withMotors(DRIVE_TRAIN_LEFT, DRIVE_TRAIN_RIGHT)
-		.withDimensions(AbstractMotor::gearset::red, {{4_in, 11_in}, imev5RedTPR})
+		.withMotors(
+      DRIVE_TRAIN_LEFT,
+      DRIVE_TRAIN_RIGHT,
+      DRIVE_TRAIN_RIGHT_BACK,
+      DRIVE_TRAIN_LEFT_BACK
+    )
+		.withDimensions(AbstractMotor::gearset::green, {{4_in, 11_in}, imev5GreenTPR})
 		.build();
 
 Controller controller;
@@ -58,14 +48,6 @@ MotorGroup barLift({
 	_barLiftRight
 });
 
-std::string prd(const double x, const int decDigits) {
-    std::stringstream ss;
-    ss << std::fixed;
-    ss.precision(decDigits); // set # places after decimal
-    ss << x;
-    return ss.str();
-}
-
 bool piston_extended = false;
 bool back_piston_extended = false;
 bool barliftGrabber_extended = false;
@@ -76,11 +58,11 @@ Motor rightGrabber(RIGHT_GRABBER);
 Motor barliftGrabber(BAR_LIFT_GRABBER);
 Motor backGrabber(BACK_GRABBER);
 Motor middleGrabber(MIDDLE_GRABBER);
+
+pros::ADIDigitalOut piston (PNEUMATICS);
 // TODO: Move this to auto start!
 // rightGrabber.moveRelative(-0.5, 1000);
 // rightGrabber.tarePosition();
-
-Motor ExtendyThing(EXTEND_O_ARM);
 
 void checkMotorTemp(Motor motor, int line) {
 	if(motor.getTemperature() > 50) {
@@ -91,12 +73,14 @@ void checkMotorTemp(Motor motor, int line) {
 
 void toggleBackGrabber() {
 	back_piston_extended = !back_piston_extended;
-	backGrabber.moveAbsolute(back_piston_extended ? -0.75 : 1.5, 1000);
+	backGrabber.moveAbsolute(back_piston_extended ? -0.5 : 1.5, 1000);
 }
 
 void toggleFrontGrabber() {
+	// piston.set_value(!piston.get_value());
 	barliftGrabber_extended = !barliftGrabber_extended;
-	barliftGrabber.moveAbsolute(barliftGrabber_extended ? 0.25 : 0, 1000);
+	piston.set_value(barliftGrabber_extended);
+	// barliftGrabber.moveAbsolute(barliftGrabber_extended ? 0.25 : 0, 1000);
 }
 
 void toggleMiddleGrabber() {
@@ -110,6 +94,13 @@ void waitForMotorToStop(Motor motor) {
 	}
 }
 
+bool doAuto = true;
+
+void autoToggle() {
+  doAuto = !doAuto;
+  pros::lcd::set_text(0, doAuto ? "[!] Auto enabled" : "[!] Auto disabled");
+}
+
 /**
  * Runs initialization code. This occurs as soon as the program is started.
  *
@@ -120,12 +111,14 @@ void initialize() {
 	pros::lcd::initialize();
 	pros::lcd::set_text(0, "[!] Ready. Waiting for instructions...");
 
+  pros::lcd::register_btn0_cb(autonomous);
+  pros::lcd::register_btn1_cb(autoToggle);
+
 	barLift.setBrakeMode(AbstractMotor::brakeMode::hold);
+	chassis->setMaxVelocity(200);
 	// chassis->getModel()->setMaxVoltage(12000);
 
-	pros::ADIDigitalOut piston (PNEUMATICS);
 	piston.set_value(false);
-	piston_extended = false;
 
 	// barliftGrabber.moveAbsolute(-0.25, 1000);
 	// barliftGrabber.tarePosition();
@@ -170,62 +163,78 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous() {
-	pros::lcd::set_text(0, "[!] Autonomous");
+  if(!doAuto) {
+    pros::lcd::set_text(0, "[!] Autonomous disabled!");
+    return;
+  }
 
-	int maxVelocity = 50;
+	pros::lcd::set_text(0, "[!] Autonomous Running.");
 
 	// Intialize
 	backGrabber.moveAbsolute(1.1, 1000);
 	waitForMotorToStop(backGrabber);
 	backGrabber.tarePosition();
 
+  toggleBackGrabber();
+	toggleBackGrabber();
+
  	// TODO: Uncomment when its back
 	// rightGrabber.moveAbsolute(0.5, 1000);
 	// waitForMotorToStop(backGrabber);
 	// rightGrabber.tarePosition();
 
-	// Extend back grabber to pickup back ring
-	toggleBackGrabber();
-	toggleBackGrabber();
+  chassis->setMaxVelocity(600);
+  // chassis->moveDistance(-155_cm);
+  chassis->moveDistance(-175_cm);
 
-	// TODO: REMOVE AFTER testing
-	// Set the velocity to 50% so I can easily see what's happening.
-	chassis->setMaxVelocity(maxVelocity);
+  toggleBackGrabber();
+  waitForMotorToStop(backGrabber);
 
-	// Move backwards to the first ring.
-	chassis->moveDistance(-94_cm);
+  // chassis->moveDistance(34_cm);
+  chassis->moveDistance(64_cm);
 
-	// Fully extend back grabber.
-	toggleFrontGrabber();
+  pros::lcd::set_text(0, "[!] Autonomous Done");
 
-	// Turn a little to wiggle the ring in.
-	chassis->setMaxVelocity(20);
-	chassis->moveDistanceAsync(-10_cm);
-	chassis->setMaxVelocity(maxVelocity);
-	chassis->getModel()->right(10);
-	chassis->getModel()->left(-10);
-	pros::delay(700);
-	chassis->getModel()->stop();
-	pros::delay(300);
+	// // Extend back grabber to pickup back ring
 
-	// Grab it.
-	toggleBackGrabber();
-
-	// Move to the other ring.
-	chassis->moveDistance(40_cm);
-	chassis->turnAngle(-45_deg);
-	chassis->moveDistance(20_cm);
-	toggleFrontGrabber();
-	barLift.moveVelocity(20);
-	pros::delay(400);
-	barLift.moveVelocity(0);
-	chassis->turnAngle(45_deg);
-	chassis->moveDistance(33_cm);
-	chassis->turnAngle(90_deg);
-	barLift.moveVelocity(-20);
-	pros::delay(400);
-	barLift.moveVelocity(0);
-	chassis->moveDistance(100_cm);
+	// // TODO: REMOVE AFTER testing
+	// // Set the velocity to 50% so I can easily see what's happening.
+	// chassis->setMaxVelocity(maxVelocity);
+  //
+	// // Move backwards to the first ring.
+	// chassis->moveDistance(-94_cm);
+  //
+	// // Fully extend back grabber.
+	// toggleFrontGrabber();
+  //
+	// // Turn a little to wiggle the ring in.
+	// chassis->setMaxVelocity(20);
+	// chassis->moveDistanceAsync(-10_cm);
+	// chassis->setMaxVelocity(maxVelocity);
+	// chassis->getModel()->right(10);
+	// chassis->getModel()->left(-10);
+	// pros::delay(700);
+	// chassis->getModel()->stop();
+	// pros::delay(300);
+  //
+	// // Grab it.
+	// toggleBackGrabber();
+  //
+	// // Move to the other ring.
+	// chassis->moveDistance(40_cm);
+	// chassis->turnAngle(-45_deg);
+	// chassis->moveDistance(20_cm);
+	// toggleFrontGrabber();
+	// barLift.moveVelocity(20);
+	// pros::delay(400);
+	// barLift.moveVelocity(0);
+	// chassis->turnAngle(45_deg);
+	// chassis->moveDistance(33_cm);
+	// chassis->turnAngle(90_deg);
+	// barLift.moveVelocity(-20);
+	// pros::delay(400);
+	// barLift.moveVelocity(0);
+	// chassis->moveDistance(100_cm);
 }
 
 /**
@@ -273,17 +282,11 @@ void opcontrol() {
 			pros::lcd::set_text(1, "Lift Stopped");
 		} else {
 			pros::lcd::set_text(1, l1Pressed ? "Moving Lift Up" : "Moving Lift Down");
-			barLift.moveVelocity(l1Pressed ? +20 : -20);
+			barLift.moveVelocity(l1Pressed ? +60 : -60);
 		}
 
 		bool r1Pressed = controller.getDigital(ControllerDigital::R1);
 		bool r2Pressed = controller.getDigital(ControllerDigital::R2);
-
-		if((!r1Pressed && !r2Pressed) || (r1Pressed && r2Pressed)) {
-			ExtendyThing.moveVelocity(0);
-		} else {
-			ExtendyThing.moveVelocity(r1Pressed ? +1000 : -1000);
-		}
 
 		if(DownPressed.update()) {
 			isDriveHoldMode = !isDriveHoldMode;
@@ -312,12 +315,12 @@ void opcontrol() {
 			toggleMiddleGrabber();
 		}
 
-		int motorTempLine = -1;
-		checkMotorTemp(rightGrabber, ++motorTempLine);
-		checkMotorTemp(backGrabber, ++motorTempLine);
-		checkMotorTemp(rightGrabber, ++motorTempLine);
-		checkMotorTemp(_barLiftLeft, ++motorTempLine);
-		checkMotorTemp(_barLiftRight, ++motorTempLine);
+		// int motorTempLine = -1;
+		// checkMotorTemp(rightGrabber, ++motorTempLine);
+		// checkMotorTemp(backGrabber, ++motorTempLine);
+		// checkMotorTemp(rightGrabber, ++motorTempLine);
+		// checkMotorTemp(_barLiftLeft, ++motorTempLine);
+		// checkMotorTemp(_barLiftRight, ++motorTempLine);
 		// checkMotorTemp(barliftGrabber, ++motorTempLine);
 
 		pros::delay(10);
