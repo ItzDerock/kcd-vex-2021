@@ -73,7 +73,7 @@ void checkMotorTemp(Motor motor, int line) {
 
 void toggleBackGrabber() {
 	back_piston_extended = !back_piston_extended;
-	backGrabber.moveAbsolute(back_piston_extended ? -0.5 : 1.5, 1000);
+	backGrabber.moveAbsolute(back_piston_extended ? -0.4 : 1.5, 1000);
 }
 
 void toggleFrontGrabber() {
@@ -171,7 +171,7 @@ void autonomous() {
 	pros::lcd::set_text(0, "[!] Autonomous Running.");
 
 	// Intialize
-	backGrabber.moveAbsolute(1.1, 1000);
+	backGrabber.moveAbsolute(0.7, 1000);
 	waitForMotorToStop(backGrabber);
 	backGrabber.tarePosition();
 
@@ -185,13 +185,28 @@ void autonomous() {
 
   chassis->setMaxVelocity(600);
   // chassis->moveDistance(-155_cm);
-  chassis->moveDistance(-175_cm);
+  // chassis->moveDistance(-175_cm);
+  chassis->moveDistance(-10_cm);
+  barLift.moveRelative(200, 1000);
+  chassis->moveDistance(-105_cm);
+  chassis->turnAngle(-90_deg);
+  chassis->moveDistance(-110_cm);
+
+  chassis->setMaxVelocity(50);
+  chassis->moveDistance(-30_cm);
+  chassis->setMaxVelocity(600);
+
+  chassis->turnAngle(-80_deg);
 
   toggleBackGrabber();
   waitForMotorToStop(backGrabber);
 
+  chassis->turnAngle(90_deg);
+
   // chassis->moveDistance(34_cm);
-  chassis->moveDistance(64_cm);
+  chassis->moveDistance(120_cm);
+  chassis->turnAngle(-260_deg);
+  chassis->moveDistance(-50_cm);
 
   pros::lcd::set_text(0, "[!] Autonomous Done");
 
@@ -259,6 +274,8 @@ void opcontrol() {
 	auto DownPressed = ControllerButtonHandler(&controller, ControllerDigital::down);
 	auto UpPressed = ControllerButtonHandler(&controller, ControllerDigital::up);
 
+  // auto backGrabberStopper = MotorHoldOnStop(&backGrabber);
+
 	while (true) {
 		auto leftMoveStick = controller.getAnalog(ControllerAnalog::leftY);
 		auto rightMoveStick = controller.getAnalog(ControllerAnalog::rightY);
@@ -314,6 +331,8 @@ void opcontrol() {
 		if(UpPressed.update()) {
 			toggleMiddleGrabber();
 		}
+
+    // backGrabberStopper.update();
 
 		// int motorTempLine = -1;
 		// checkMotorTemp(rightGrabber, ++motorTempLine);
