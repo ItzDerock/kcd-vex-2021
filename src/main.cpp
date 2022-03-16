@@ -179,7 +179,7 @@ void autonomous() {
 	pros::lcd::set_text(0, "[!] Autonomous Running.");
 
 	// Intialize
-	backGrabber.moveAbsolute(0.6, 1000);
+	backGrabber.moveAbsolute(0.7, 1000);
 	waitForMotorToStop(backGrabber);
 	backGrabber.tarePosition();
 
@@ -196,7 +196,7 @@ void autonomous() {
   // chassis->moveDistance(-175_cm);
   chassis->moveDistance(-20_cm);
   barLift.moveRelative(200, 1000);
-  chassis->moveDistance(-105_cm);
+  chassis->moveDistance(-106_cm);
   chassis->turnAngle(-90_deg);
   chassis->moveDistance(-80_cm);
 
