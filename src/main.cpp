@@ -71,9 +71,9 @@ void checkMotorTemp(Motor motor, int line) {
 	}
 }
 
-void toggleBackGrabber() {
+void toggleBackGrabber(int velocity = 1000) {
 	back_piston_extended = !back_piston_extended;
-	backGrabber.moveAbsolute(back_piston_extended ? -0.4 : 1.5, 1000);
+	backGrabber.moveAbsolute(back_piston_extended ? -0.4 : 1.5, velocity);
 }
 
 void toggleFrontGrabber() {
@@ -88,9 +88,17 @@ void toggleMiddleGrabber() {
 	middleGrabber.moveAbsolute(middleGrabber_extended ? -1 : -0.4, 1000);
 }
 
-void waitForMotorToStop(Motor motor) {
+void waitForMotorToStop(Motor motor, int timeout = -1) {
+  int end = timeout > 0 ? (pros::millis() + timeout) : -1;
+
 	while(abs(motor.getPosition() - motor.getTargetPosition()) > 0.2) {
 		pros::delay(20);
+
+    if(timeout > 0) {
+      if(pros::millis() > end) {
+        break;
+      }
+    }
 	}
 }
 
@@ -171,7 +179,7 @@ void autonomous() {
 	pros::lcd::set_text(0, "[!] Autonomous Running.");
 
 	// Intialize
-	backGrabber.moveAbsolute(0.7, 1000);
+	backGrabber.moveAbsolute(0.6, 1000);
 	waitForMotorToStop(backGrabber);
 	backGrabber.tarePosition();
 
@@ -186,27 +194,28 @@ void autonomous() {
   chassis->setMaxVelocity(600);
   // chassis->moveDistance(-155_cm);
   // chassis->moveDistance(-175_cm);
-  chassis->moveDistance(-10_cm);
+  chassis->moveDistance(-20_cm);
   barLift.moveRelative(200, 1000);
   chassis->moveDistance(-105_cm);
   chassis->turnAngle(-90_deg);
-  chassis->moveDistance(-110_cm);
+  chassis->moveDistance(-80_cm);
 
   chassis->setMaxVelocity(50);
-  chassis->moveDistance(-30_cm);
+  chassis->moveDistance(-40_cm);
+
+  chassis->turnAngle(-40_deg);
+
   chassis->setMaxVelocity(600);
 
-  chassis->turnAngle(-80_deg);
+  toggleBackGrabber(100);
+  waitForMotorToStop(backGrabber, 1000);
 
-  toggleBackGrabber();
-  waitForMotorToStop(backGrabber);
-
-  chassis->turnAngle(90_deg);
+  chassis->turnAngle(30_deg);
 
   // chassis->moveDistance(34_cm);
-  chassis->moveDistance(120_cm);
+  chassis->moveDistance(130_cm);
   chassis->turnAngle(-260_deg);
-  chassis->moveDistance(-50_cm);
+  chassis->moveDistance(-80_cm);
 
   pros::lcd::set_text(0, "[!] Autonomous Done");
 
