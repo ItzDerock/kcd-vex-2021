@@ -73,7 +73,7 @@ void checkMotorTemp(Motor motor, int line) {
 
 void toggleBackGrabber(int velocity = 1000) {
 	back_piston_extended = !back_piston_extended;
-	backGrabber.moveAbsolute(back_piston_extended ? -0.4 : 1.5, velocity);
+	backGrabber.moveAbsolute(back_piston_extended ? -0.5 : 1.5, velocity);
 }
 
 void toggleFrontGrabber() {
@@ -171,20 +171,20 @@ void competition_initialize() {}
  * from where it left off.
  */
 void autonomous() {
-  if(!doAuto) {
-    pros::lcd::set_text(0, "[!] Autonomous disabled!");
-    return;
-  }
-
 	pros::lcd::set_text(0, "[!] Autonomous Running.");
 
 	// Intialize
-	backGrabber.moveAbsolute(0.7, 1000);
+	backGrabber.moveAbsolute(1, 1000);
 	waitForMotorToStop(backGrabber);
 	backGrabber.tarePosition();
 
   toggleBackGrabber();
 	toggleBackGrabber();
+
+  if(!doAuto) {
+    pros::lcd::set_text(0, "[!] Autonomous disabled!");
+    return;
+  }
 
  	// TODO: Uncomment when its back
 	// rightGrabber.moveAbsolute(0.5, 1000);
@@ -201,9 +201,9 @@ void autonomous() {
   chassis->moveDistance(-80_cm);
 
   chassis->setMaxVelocity(50);
-  chassis->moveDistance(-40_cm);
+  chassis->moveDistance(-50_cm);
 
-  chassis->turnAngle(-40_deg);
+  chassis->turnAngle(-60_deg);
 
   chassis->setMaxVelocity(600);
 
@@ -215,7 +215,7 @@ void autonomous() {
   // chassis->moveDistance(34_cm);
   chassis->moveDistance(130_cm);
   chassis->turnAngle(-260_deg);
-  chassis->moveDistance(-80_cm);
+  chassis->moveDistance(-50_cm);
 
   pros::lcd::set_text(0, "[!] Autonomous Done");
 
